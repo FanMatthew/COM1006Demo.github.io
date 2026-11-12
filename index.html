@@ -1,0 +1,1064 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#FFCD00">
+  <title>Citybus · BusPulse AI Control Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: "#090e18",
+            panel: "#111827",
+            line: "#202b3b",
+            muted: "#8794a8",
+            mint: "#FFCD00",
+            sky: "#70b8ff",
+            amber: "#FFCD00"
+          },
+          fontFamily: {
+            sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body {
+      min-width: 340px;
+      background: #F4F6F9;
+      color: #003366;
+    }
+    .panel {
+      background: #FFFFFF;
+      border: 1px solid #E1E7EF;
+      box-shadow: 0 8px 26px rgba(27, 42, 74, .06);
+    }
+    .top-nav {
+      background: #FFCD00;
+      border: 1px solid #E6B900;
+      border-bottom: 2px solid #003366;
+    }
+    .grid-bg {
+      background-color: #F9FBFD;
+      background-image:
+        linear-gradient(rgba(27, 42, 74, .045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(27, 42, 74, .045) 1px, transparent 1px),
+        radial-gradient(ellipse at 48% 47%, rgba(27, 42, 74, .035), transparent 58%);
+      background-size: 30px 30px, 30px 30px, auto;
+    }
+    .map-label {
+      font: 600 12px ui-sans-serif, system-ui, sans-serif;
+      fill: #003366;
+      letter-spacing: .01em;
+    }
+    .map-caption {
+      font: 500 9px ui-sans-serif, system-ui, sans-serif;
+      fill: #64748b;
+      letter-spacing: .12em;
+    }
+    .stop-sequence {
+      scrollbar-width: thin;
+      scrollbar-color: #CBD5E1 transparent;
+    }
+    .stop-sequence::-webkit-scrollbar,
+    .demand-scroll::-webkit-scrollbar { height: 5px; }
+    .stop-sequence::-webkit-scrollbar-thumb,
+    .demand-scroll::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 999px; }
+    .route-direction[aria-pressed="true"] {
+      background: #003366 !important;
+      border-color: #003366 !important;
+      color: #FFFFFF !important;
+    }
+    .map-road {
+      fill: none;
+      stroke: #D8E0EA;
+      stroke-width: 22;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .route-line {
+      fill: none;
+      stroke: #003366;
+      stroke-width: 2.5;
+      stroke-dasharray: 6 8;
+      stroke-linecap: round;
+      opacity: .8;
+    }
+    .route-line.pulse { animation: route-dash 1.2s linear infinite; }
+    .alternate-line {
+      fill: none;
+      stroke: #76c6ff;
+      stroke-width: 3;
+      stroke-dasharray: 8 7;
+      stroke-linecap: round;
+      opacity: 0;
+      transition: opacity .3s ease;
+    }
+    .alternate-line.active {
+      opacity: 1;
+      animation: route-dash .7s linear infinite, glow 1.7s ease-in-out infinite alternate;
+    }
+    .hazard { filter: drop-shadow(0 0 8px rgba(251, 91, 91, .55)); }
+    .bus-icon { filter: drop-shadow(0 3px 5px rgba(0, 0, 0, .4)); }
+    .stop-dot { filter: drop-shadow(0 0 6px rgba(255, 205, 0, .36)); }
+    .queue-fill { transition: height .65s cubic-bezier(.2,.8,.2,1), y .65s cubic-bezier(.2,.8,.2,1), fill .3s; }
+    .queue-pill { transition: color .25s, border-color .25s, background .25s; }
+    .alert-enter { animation: alert-in .32s ease-out both; }
+    .text-mint { color: #003366 !important; }
+    .top-nav .text-white,
+    .top-nav .text-white\/65,
+    .top-nav .text-slate-300\/70,
+    .top-nav .text-slate-300\/75 { color: #003366 !important; }
+    .top-nav .text-white\/90 { color: #003366 !important; }
+    .top-nav .bg-\[\#FFCD00\] { background-color: #FFFFFF !important; }
+    .top-nav .border-white\/20 { border-color: rgba(0, 51, 102, .26) !important; }
+    .top-nav .bg-white\/\[\.06\] { background-color: rgba(0, 51, 102, .07) !important; }
+    .top-nav .hover\:bg-white\/\[\.12\]:hover { background-color: rgba(0, 51, 102, .12) !important; }
+    .top-nav .shadow-black\/10 { --tw-shadow-color: rgba(0, 51, 102, .08) !important; }
+    main .text-slate-100,
+    main .text-slate-200,
+    main .text-slate-300 { color: #17365D !important; }
+    main .text-slate-400 { color: #52657D !important; }
+    main .text-slate-500,
+    main .text-slate-600 { color: #64748B !important; }
+    main .text-amber { color: #003366 !important; }
+    main [class*="border-white"] { border-color: #E1E7EF !important; }
+    main [class*="divide-x"] { --tw-divide-x-reverse: 0; }
+    main [class*="bg-white"] { background-color: #F5F7FA !important; }
+    main [class*="bg-black"] { background-color: #F5F7FA !important; }
+    main .text-sky { color: #003366 !important; }
+    main .bg-sky\/\[\.1\],
+    main .bg-sky\/\[\.08\] { background-color: #EEF3F9 !important; }
+    main .border-sky\/15,
+    main .border-sky\/20 { border-color: #D7E1EE !important; }
+    #surgeButton,
+    #antiBunchButton {
+      border-color: #003366 !important;
+      background: #003366 !important;
+      color: #FFFFFF !important;
+    }
+    #surgeButton:hover,
+    #antiBunchButton:hover { background: #174A7E !important; }
+    #accidentButton {
+      border-color: #E30613 !important;
+      background: #E30613 !important;
+      color: #FFFFFF !important;
+    }
+    #accidentButton:hover { background: #B9000D !important; }
+    #demandAlert {
+      border-color: #F3B7BC !important;
+      background: #FFF1F2 !important;
+    }
+    #demandAlert .text-amber { color: #E30613 !important; }
+    #loadStatus.text-rose-300,
+    #headwayScore.text-rose-300,
+    #headwayStatus.text-rose-300,
+    #incidentBadge.text-rose-300,
+    #etaDelta.text-amber,
+    #mapStatus.text-amber { color: #E30613 !important; }
+    #mapStatus .bg-amber { background-color: #E30613 !important; }
+    #loadStatus.text-rose-300 { border-radius: .375rem; background: #FFF1F2; padding: .125rem .375rem; }
+    #incidentBadge.text-rose-300,
+    #etaDelta.text-amber { background: #FFF1F2 !important; border-color: #F3B7BC !important; }
+    #rerouteNotice {
+      color: #003366 !important;
+      border-color: #CBD9E9 !important;
+      background: #EEF3F9 !important;
+    }
+    .map-label { fill: #003366; }
+    .map-caption { fill: #64748B; }
+    .map-road { stroke: #D8E0EA; }
+    .route-line { stroke: #003366; }
+    .grid-bg > .absolute { background: rgba(255, 255, 255, .94) !important; border-color: #E1E7EF !important; }
+    #alternatePath { stroke: #547AA5; }
+    #accidentMarker path:first-of-type { fill: #E30613; stroke: #FFFFFF; }
+    button { -webkit-tap-highlight-color: transparent; }
+    button:focus-visible { outline: 2px solid #FFCD00; outline-offset: 3px; }
+    @keyframes route-dash { to { stroke-dashoffset: -28; } }
+    @keyframes glow { from { filter: drop-shadow(0 0 3px rgba(112,184,255,.4)); } to { filter: drop-shadow(0 0 10px rgba(112,184,255,.85)); } }
+    @keyframes alert-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body class="font-sans antialiased">
+  <div class="mx-auto min-h-screen max-w-[1600px] px-4 pb-8 pt-5 sm:px-7 lg:px-10 lg:pt-7">
+    <header class="top-nav mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl px-4 py-4 shadow-lg shadow-black/10 sm:px-5">
+      <div class="flex items-center gap-3.5">
+        <div class="grid h-11 w-11 place-items-center rounded-[14px] border border-[#FFCD00]/30 bg-[#FFCD00] text-[#1B2A4A]">
+          <svg aria-hidden="true" viewBox="0 0 24 24" class="h-6 w-6" fill="none">
+            <path d="M4 16.5h16M6.5 16.5l1-8a2 2 0 0 1 2-1.75h5a2 2 0 0 1 2 1.75l1 8M8 11h8M8 19v-2.5m8 2.5v-2.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="9" cy="14.5" r=".8" fill="currentColor"/><circle cx="15" cy="14.5" r=".8" fill="currentColor"/>
+            <path d="M12 3.5v2m-3.5-2 1 1.7m6-1.7-1 1.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div>
+          <p class="mb-0.5 text-[10px] font-semibold uppercase tracking-[.2em] text-slate-300/70">Citybus · Fleet intelligence</p>
+          <h1 class="text-lg font-semibold tracking-tight text-white sm:text-xl">Citybus <span class="font-normal text-white/65">BusPulse AI Control Center</span></h1>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 sm:gap-4">
+        <div class="hidden items-center gap-2 text-xs text-slate-300/75 sm:flex">
+          <span class="relative flex h-2 w-2">
+            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#FFCD00] opacity-30"></span>
+            <span class="relative inline-flex h-2 w-2 rounded-full bg-[#FFCD00]"></span>
+          </span>
+          Simulation online
+        </div>
+        <span class="inline-flex items-center gap-2 rounded-full border border-[#FFCD00]/30 bg-[#FFCD00] px-3 py-1.5 text-[10px] font-bold tracking-wide text-[#1B2A4A]" title="Simulation values styled for live transit telemetry">
+          <span class="h-1.5 w-1.5 rounded-full bg-[#1B2A4A]"></span> DEMO · LIVE-STYLE
+        </span>
+        <button id="resetButton" type="button" class="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/[.06] px-3 py-2 text-xs font-medium text-white/90 transition hover:border-[#FFCD00]/50 hover:bg-white/[.12] hover:text-white">
+          <svg aria-hidden="true" viewBox="0 0 20 20" class="h-3.5 w-3.5" fill="none"><path d="M16 8a6.1 6.1 0 0 0-10.4-2L4 7.5M4 4.5v3h3M4 12a6.1 6.1 0 0 0 10.4 2L16 12.5m0 3v-3h-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="hidden sm:inline">Reset Simulation</span><span class="sm:hidden">Reset</span>
+        </button>
+      </div>
+      <div class="w-full border-t border-[#003366]/15 pt-3">
+        <div class="grid items-end gap-3 lg:grid-cols-[minmax(230px,340px)_minmax(0,1fr)]">
+          <form id="routeSearchForm" class="min-w-0" role="search">
+            <label for="routeInput" class="mb-1.5 block text-[9px] font-bold uppercase tracking-[.15em] text-[#003366]/70">CTB route &amp; direction</label>
+            <div class="flex rounded-lg shadow-sm">
+              <input id="routeInput" name="route" type="text" value="788" maxlength="8" autocomplete="off" spellcheck="false" aria-label="Citybus route number" placeholder="e.g. 788, 8P, 118, 969, A11" class="min-w-0 flex-1 rounded-l-lg border border-[#003366]/20 bg-white px-3 py-2 text-sm font-semibold uppercase text-[#003366] placeholder:font-normal placeholder:text-slate-400 focus:z-10 focus:border-[#003366] focus:outline-none focus:ring-2 focus:ring-[#003366]/15">
+              <button type="submit" class="rounded-r-lg border border-[#003366] bg-[#003366] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#174A7E]">Search</button>
+            </div>
+          </form>
+          <div class="min-w-0">
+            <div id="routeDirectionButtons" class="flex min-h-[37px] flex-wrap gap-2" role="group" aria-label="Route destination directions"></div>
+            <p id="routeSearchStatus" class="mt-1 min-h-3 text-[9px] leading-relaxed text-[#003366]/65" role="status" aria-live="polite">Route 788 · demo route samples ready.</p>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p class="mb-1 text-[10px] font-semibold uppercase tracking-[.2em] text-slate-500">Network overview <span class="px-1 text-slate-700">/</span> Hong Kong Island</p>
+          <h2 id="pageRouteHeading" class="text-base font-semibold text-slate-100">Route 788 · Fleet operations</h2>
+        </div>
+        <div class="flex items-center gap-2 text-[11px] text-slate-500">
+          <span class="inline-flex h-2 w-2 rounded-full bg-mint"></span> 4 buses on route
+          <span class="mx-1 text-slate-700">·</span><span id="clock">--:--:--</span> local
+        </div>
+      </div>
+
+      <div class="grid min-w-0 grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.75fr)_minmax(360px,1fr)]">
+        <section class="panel min-w-0 overflow-hidden rounded-2xl" aria-labelledby="mapHeading">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-white/[.07] px-5 py-4">
+            <div class="flex items-center gap-3">
+              <div class="grid h-9 w-9 place-items-center rounded-xl bg-sky/[.1] text-sky">
+                <svg aria-hidden="true" viewBox="0 0 20 20" class="h-4 w-4" fill="none"><path d="M3.5 5.5 7 3.7l6 2.1 3.5-1.6v10.3L13 16l-6-2.1-3.5 1.6V5.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M7 3.8v10m6-8v10" stroke="currentColor" stroke-width="1.3"/></svg>
+              </div>
+              <div>
+                <h2 id="mapHeading" class="text-sm font-semibold text-slate-100">Route 788 <span class="font-normal text-slate-400">· Hong Kong Island</span></h2>
+                <p id="routeEndpoints" class="mt-0.5 text-[11px] text-slate-500">Siu Sai Wan (Island Resort) <span class="px-1 text-slate-700">↔</span> Central (Macao Ferry)</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 text-[10px] text-slate-400 sm:gap-4">
+              <span class="inline-flex items-center gap-1.5"><i class="h-1.5 w-4 rounded-full bg-mint"></i>Route 788</span>
+              <span class="inline-flex items-center gap-1.5"><i class="h-1.5 w-4 rounded-full bg-sky"></i>King's Road / Chai Wan Road Detour</span>
+              <span class="inline-flex items-center gap-1.5"><i class="h-2 w-2 rounded-full bg-rose-400"></i>Incident</span>
+            </div>
+          </div>
+          <div class="grid-bg relative overflow-x-auto">
+            <div class="absolute left-4 top-4 z-10 rounded-lg border border-white/[.08] bg-[#0d1622]/90 px-3 py-2 backdrop-blur">
+              <p class="text-[9px] font-semibold uppercase tracking-[.17em] text-slate-500">Active fleet</p>
+              <p class="mt-1 text-sm font-semibold tabular-nums text-slate-100">04 <span class="ml-1 text-[10px] font-normal text-slate-500">vehicles</span></p>
+            </div>
+            <div class="absolute right-4 top-4 z-10 rounded-lg border border-white/[.08] bg-[#0d1622]/90 px-3 py-2 text-right backdrop-blur">
+              <p class="text-[9px] font-semibold uppercase tracking-[.17em] text-slate-500">Demo service status</p>
+              <p id="mapStatus" class="mt-1 flex items-center justify-end gap-1.5 text-[11px] font-medium text-mint"><span class="h-1.5 w-1.5 rounded-full bg-mint"></span>On schedule</p>
+            </div>
+            <svg id="routeMap" viewBox="0 0 760 500" class="block h-auto min-h-[310px] w-full min-w-[560px] sm:min-w-0" role="img" aria-labelledby="svgTitle svgDesc">
+              <title id="svgTitle">Schematic Citybus Route 788 map</title>
+              <desc id="svgDesc">A schematic Citybus route map showing selected stops in route order. Four animated buses travel the circuit and divert via the King's Road / Chai Wan Road Detour when an accident is injected. Vehicle positions are simulated.</desc>
+              <defs>
+                <filter id="softGlow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                <g id="busShape">
+                  <rect x="-13" y="-8" width="26" height="16" rx="5" fill="#FFCD00"/>
+                  <rect x="-8.5" y="-5.5" width="13" height="5" rx="1.7" fill="#1B2A4A"/>
+                  <path d="M-9 2h18" stroke="#1B2A4A" stroke-width="1.2"/>
+                  <circle cx="-7.5" cy="7" r="2" fill="#FFF2B3"/><circle cx="7.5" cy="7" r="2" fill="#FFF2B3"/>
+                  <path d="M11-3h2v5h-2" fill="#fff"/>
+                </g>
+              </defs>
+              <path d="M66 107h67M626 92h73M65 394h68M629 403h69M368 52v31M369 411v38" stroke="#263647" stroke-width="1" stroke-dasharray="3 7"/>
+              <path d="M95 250h52M617 246h50" stroke="#263647" stroke-width="1" stroke-dasharray="3 7"/>
+              <text x="355" y="33" class="map-caption">HONG KONG ISLAND</text>
+              <text x="344" y="475" class="map-caption">CENTRAL &amp; WESTERN DISTRICT</text>
+              <text x="56" y="241" class="map-caption">CHAI WAN</text>
+              <text x="665" y="234" class="map-caption">EASTERN DISTRICT</text>
+              <path d="M180 120 C270 65 500 65 590 120" class="map-road"/>
+              <path d="M590 120 C660 180 660 300 580 360" class="map-road"/>
+              <path d="M580 360 C480 420 270 420 180 360" class="map-road"/>
+              <path d="M180 360 C100 300 105 190 180 120" class="map-road"/>
+              <path d="M180 120 C270 65 500 65 590 120 C660 180 660 300 580 360 C480 420 270 420 180 360 C100 300 105 190 180 120" class="route-line"/>
+              <path id="alternatePath" d="M618 151 C708 190 708 291 608 332" class="alternate-line"/>
+              <text x="626" y="244" class="map-caption" transform="rotate(90 626 244)">ISLAND EASTERN CORRIDOR (IEC)</text>
+              <text x="700" y="245" class="map-caption" text-anchor="middle" transform="rotate(90 700 245)">KING'S ROAD / CHAI WAN ROAD DETOUR</text>
+              <g id="accidentMarker" class="hazard" style="display:none" transform="translate(623 245)">
+                <circle r="20" fill="#f15d67" opacity=".12"/>
+                <path d="M0-15 14 10H-14L0-15Z" fill="#fa6871" stroke="#ffd0d0" stroke-width="1.2" stroke-linejoin="round"/>
+                <path d="M0-7v7" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+                <circle cy="5" r="1.2" fill="#fff"/>
+              </g>
+              <g id="stopA" class="stop-dot" transform="translate(180 120)">
+                <circle r="10" fill="#1B2A4A" stroke="#FFCD00" stroke-width="1.5"/><circle r="3" fill="#FFCD00"/>
+                <text x="-19" y="-20" text-anchor="end" class="map-label">Siu Sai Wan (Island Resort)</text>
+                <text x="-19" y="-7" text-anchor="end" class="map-caption">STOP 1 · TERMINUS</text>
+              </g>
+              <g id="stopB" class="stop-dot" transform="translate(590 120)">
+                <circle r="10" fill="#1B2A4A" stroke="#FFCD00" stroke-width="1.5"/><circle r="3" fill="#FFCD00"/>
+                <text x="19" y="-20" class="map-label">Chai Wan Industrial City</text>
+                <text x="19" y="-7" class="map-caption">STOP 2 · WING TAI ROAD</text>
+              </g>
+              <g id="stopC" class="stop-dot" transform="translate(580 360)">
+                <circle r="10" fill="#1B2A4A" stroke="#FFCD00" stroke-width="1.5"/><circle r="3" fill="#FFCD00"/>
+                <text x="-19" y="5" text-anchor="end" class="map-label">Immigration Tower</text>
+                <text x="-19" y="18" text-anchor="end" class="map-caption">STOP 3 · WAN CHAI NORTH</text>
+              </g>
+              <g id="stopD" class="stop-dot" transform="translate(180 360)">
+                <circle r="10" fill="#1B2A4A" stroke="#FFCD00" stroke-width="1.5"/><circle r="3" fill="#FFCD00"/>
+                <text x="-19" y="5" text-anchor="end" class="map-label">Central (Macao Ferry)</text>
+                <text x="-19" y="18" text-anchor="end" class="map-caption">STOP 4 · TERMINUS</text>
+              </g>
+              <g id="buses" aria-label="Animated buses">
+                <g class="bus-icon" data-bus="0"><use href="#busShape"/></g>
+                <g class="bus-icon" data-bus="1"><use href="#busShape"/></g>
+                <g class="bus-icon" data-bus="2"><use href="#busShape"/></g>
+                <g class="bus-icon" data-bus="3"><use href="#busShape"/></g>
+              </g>
+              <g transform="translate(42 449)">
+                <circle r="3" fill="#FFCD00"/><text x="10" y="3" class="map-caption">BUS IN SERVICE</text>
+              </g>
+            </svg>
+            <div id="routeStopSequence" class="stop-sequence flex gap-2 overflow-x-auto border-t border-slate-200/80 bg-white/90 px-4 py-2.5" aria-label="CTB stop sequence"></div>
+            <span class="pointer-events-none absolute bottom-3 right-4 rounded-full border border-white/10 bg-[#0d1622]/90 px-2.5 py-1 text-[9px] text-slate-400 sm:hidden">Swipe map to explore →</span>
+          </div>
+          <div class="grid grid-cols-2 divide-x divide-white/[.07] border-t border-white/[.07] sm:grid-cols-4">
+            <div class="px-5 py-3.5">
+              <p class="text-[9px] font-semibold uppercase tracking-[.16em] text-slate-500">Scheduled headway · demo</p>
+              <p class="mt-1 text-sm font-semibold text-slate-200"><span id="frequencyValue">6</span> <span class="text-[10px] font-normal text-slate-500">min · reference</span></p>
+            </div>
+            <div class="px-5 py-3.5">
+              <p id="nextBusLabel" class="text-[9px] font-semibold uppercase tracking-[.16em] text-slate-500">Next bus · Chai Wan Industrial City</p>
+              <p class="mt-1 text-sm font-semibold text-slate-200"><span id="nextBusValue">3</span> <span class="text-[10px] font-normal text-slate-500">min</span></p>
+            </div>
+            <div class="border-t border-white/[.07] px-5 py-3.5 sm:border-t-0 sm:border-l-0">
+              <p id="loadStopLabel" class="text-[9px] font-semibold uppercase tracking-[.16em] text-slate-500">Passenger load · Chai Wan Industrial City</p>
+              <p class="mt-1 text-sm font-semibold text-mint" id="loadStatus">Normal <span class="text-[10px] font-normal text-slate-500">· 18 pax</span></p>
+            </div>
+            <div class="border-t border-white/[.07] px-5 py-3.5 sm:border-t-0">
+              <p class="text-[9px] font-semibold uppercase tracking-[.16em] text-slate-500">Headway status</p>
+              <p class="mt-1 text-sm font-semibold text-mint" id="headwayStatus">Even <span class="text-[10px] font-normal text-slate-500">· 6 min</span></p>
+            </div>
+          </div>
+        </section>
+
+        <aside class="min-w-0 space-y-4" aria-label="AI dispatch controls">
+          <article class="panel rounded-2xl p-4 sm:p-5">
+            <div class="mb-3 flex items-center justify-between border-b border-white/[.07] pb-2.5">
+              <p class="text-[9px] font-semibold uppercase tracking-[.16em] text-slate-500">Passenger demand monitor</p>
+              <span class="rounded bg-white/[.05] px-1.5 py-1 text-[8px] font-medium uppercase tracking-wide text-slate-500">Simulation</span>
+            </div>
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex items-center gap-3">
+                <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-amber/15 bg-amber/[.08] text-amber">
+                  <svg aria-hidden="true" viewBox="0 0 20 20" class="h-[18px] w-[18px]" fill="none"><path d="M3.5 15.5V10m4.3 5.5V5m4.4 10.5V8m4.3 7.5V3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="m3.5 7.3 4.3-3.2 4.4 2 4.3-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div>
+                  <p class="text-[9px] font-semibold uppercase tracking-[.17em] text-amber">Predictive AI · Model 01</p>
+                  <h3 class="mt-0.5 text-sm font-semibold text-slate-100">LSTM Demand Forecasting</h3>
+                </div>
+              </div>
+              <span class="mt-1 rounded-full border border-amber/15 bg-amber/[.06] px-2 py-1 text-[9px] font-medium text-amber">96.2% accuracy</span>
+            </div>
+            <p class="mt-3 text-[11px] leading-relaxed text-slate-500">Predicted queue by stop · next 30 min <span class="text-slate-600">/ illustrative demo data</span></p>
+            <div class="mt-3 flex min-w-0 items-end justify-between gap-3" aria-label="Passenger queue estimates">
+              <div class="demand-scroll min-w-0 flex-1 overflow-x-auto">
+                <div id="demandBars" class="flex min-w-max items-end gap-3 px-1 pb-1" aria-label="Passenger demand by route stop"></div>
+              </div>
+              <div class="mb-4 text-right">
+                <p id="demandStopName" class="max-w-28 text-[9px] text-slate-500">Chai Wan Industrial City</p>
+                <p class="mt-0.5 text-sm font-semibold tabular-nums text-slate-200"><span id="queueCount">18</span> <span class="text-[9px] font-normal text-slate-500">pax</span></p>
+              </div>
+            </div>
+            <div id="demandAlert" class="mt-3 hidden rounded-lg border border-amber/20 bg-amber/[.07] px-3 py-2.5" role="status" aria-live="polite">
+              <div class="flex items-start gap-2">
+                <svg aria-hidden="true" viewBox="0 0 20 20" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber" fill="none"><path d="M10 2.5 18 17H2L10 2.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 7v4m0 2.5h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <div><p class="text-[10px] font-semibold text-amber">15-Min Lead Time Alert</p><p class="mt-0.5 text-[10px] text-slate-300">Dispatch reserve bus · <span id="alertStopName">Chai Wan Industrial City</span> demand surge predicted</p></div>
+              </div>
+            </div>
+            <button id="surgeButton" type="button" class="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-[#FFCD00] bg-[#FFCD00] px-3 py-2.5 text-[11px] font-semibold text-[#1B2A4A] transition hover:border-[#ffe366] hover:bg-[#ffe366]">
+              <svg aria-hidden="true" viewBox="0 0 16 16" class="h-3.5 w-3.5" fill="none"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              Simulate Rain / Concert Surge
+            </button>
+          </article>
+
+          <article class="panel rounded-2xl p-4 sm:p-5">
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex items-center gap-3">
+                <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-sky/15 bg-sky/[.08] text-sky">
+                  <svg aria-hidden="true" viewBox="0 0 20 20" class="h-[18px] w-[18px]" fill="none"><circle cx="5" cy="10" r="2" stroke="currentColor" stroke-width="1.4"/><circle cx="15" cy="5" r="2" stroke="currentColor" stroke-width="1.4"/><circle cx="15" cy="15" r="2" stroke="currentColor" stroke-width="1.4"/><path d="m6.8 9 6.4-3m-6.4 5 6.4 3" stroke="currentColor" stroke-width="1.3"/></svg>
+                </div>
+                <div>
+                  <p class="text-[9px] font-semibold uppercase tracking-[.17em] text-sky">Reinforcement learning · Model 02</p>
+                  <h3 class="mt-0.5 text-sm font-semibold text-slate-100">RL Dynamic Dispatching</h3>
+                </div>
+              </div>
+              <span id="rlMode" class="mt-1 rounded-full border border-mint/15 bg-mint/[.06] px-2 py-1 text-[9px] font-medium text-mint">AUTO CONTROL</span>
+            </div>
+            <div class="mt-4 flex items-end justify-between rounded-lg border border-white/[.06] bg-black/[.12] px-3 py-2.5">
+              <div>
+                <p class="text-[9px] font-medium uppercase tracking-[.13em] text-slate-500">Headway regularity</p>
+                <p class="mt-1 flex items-baseline gap-1"><span id="headwayScore" class="text-xl font-semibold tabular-nums text-mint">94</span><span class="text-[10px] text-slate-500">/ 100</span></p>
+              </div>
+              <div class="mb-1 flex h-7 items-end gap-1" aria-hidden="true">
+                <i class="h-3 w-1 rounded-sm bg-mint/35"></i><i class="h-4 w-1 rounded-sm bg-mint/45"></i><i class="h-3.5 w-1 rounded-sm bg-mint/55"></i><i class="h-6 w-1 rounded-sm bg-mint/60"></i><i class="h-5 w-1 rounded-sm bg-mint/75"></i><i id="scoreBar" class="h-6 w-1 rounded-sm bg-mint"></i>
+              </div>
+            </div>
+            <div class="mt-3 grid grid-cols-2 gap-2">
+              <button id="bunchButton" type="button" class="rounded-lg border border-white/[.1] bg-white/[.035] px-2.5 py-2.5 text-[10px] font-medium text-slate-300 transition hover:border-rose-300/30 hover:bg-rose-400/[.07] hover:text-rose-200">Trigger Bus Bunching</button>
+              <button id="antiBunchButton" type="button" class="rounded-lg border border-[#FFCD00] bg-[#FFCD00] px-2.5 py-2.5 text-[10px] font-semibold text-[#1B2A4A] transition hover:border-[#ffe366] hover:bg-[#ffe366]">Activate RL Anti-Bunching</button>
+            </div>
+          </article>
+
+          <article class="panel rounded-2xl p-4 sm:p-5">
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex items-center gap-3">
+                <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-rose-400/15 bg-rose-400/[.08] text-rose-300">
+                  <svg aria-hidden="true" viewBox="0 0 20 20" class="h-[18px] w-[18px]" fill="none"><path d="M10 2.5 17 5v4.7c0 3.9-2.8 6.4-7 7.8-4.2-1.4-7-3.9-7-7.8V5l7-2.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="m10 6-.8 4h2.3L9.7 14l.5-3.2H8.5L10 6Z" fill="currentColor" stroke="currentColor" stroke-linejoin="round"/></svg>
+                </div>
+                <div>
+                  <p class="text-[9px] font-semibold uppercase tracking-[.17em] text-rose-300">Pathfinding · Model 03</p>
+                  <h3 class="mt-0.5 text-sm font-semibold text-slate-100">A* Incident Re-Routing</h3>
+                </div>
+              </div>
+              <span id="incidentBadge" class="mt-1 rounded-full border border-mint/15 bg-mint/[.06] px-2 py-1 text-[9px] font-medium text-mint">CLEAR</span>
+            </div>
+            <div class="mt-4 flex items-center justify-between rounded-lg border border-white/[.06] bg-black/[.12] px-3 py-2.5">
+              <div>
+                <p class="text-[9px] font-medium uppercase tracking-[.13em] text-slate-500">Route 788 · Immigration Tower ETA</p>
+                  <p class="mt-1 text-sm font-semibold tabular-nums text-slate-200"><span id="etaValue">12</span> <span class="text-[10px] font-normal text-slate-500">min · demo estimate</span></p>
+              </div>
+              <p id="etaDelta" class="rounded-md bg-mint/[.08] px-2 py-1 text-[9px] font-medium text-mint">On time</p>
+            </div>
+            <div id="rerouteNotice" class="mt-3 hidden rounded-lg border border-sky/20 bg-sky/[.06] px-3 py-2 text-[10px] leading-relaxed text-sky" role="status" aria-live="polite">
+              A* route active · approaching buses divert via King's Road / Chai Wan Road Detour. ETA is a simulated estimate.
+            </div>
+            <button id="accidentButton" type="button" class="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-rose-300/20 bg-rose-400/[.07] px-3 py-2.5 text-[11px] font-semibold text-rose-200 transition hover:border-rose-300/35 hover:bg-rose-400/[.13]">
+              <svg aria-hidden="true" viewBox="0 0 16 16" class="h-3.5 w-3.5" fill="none"><path d="M8 1.8 15 14H1L8 1.8Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 6v3m0 2h.01" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+              Inject Road Accident
+            </button>
+          </article>
+        </aside>
+      </div>
+      <footer class="mt-5 flex flex-wrap items-center justify-between gap-2 px-1 text-[10px] text-slate-600">
+        <p>Citybus <span class="px-1 text-slate-700">·</span> BusPulse AI transit operations demo <span class="px-1 text-slate-700">·</span> <a class="text-slate-400 underline decoration-slate-700 underline-offset-2 transition hover:text-[#FFCD00]" href="https://rt.data.gov.hk/v2/transport/citybus/route/CTB/788?route=788&amp;direction=outbound&amp;service_type=1" target="_blank" rel="noreferrer">CTB route data</a></p>
+        <p>Route geometry schematic <span class="px-1 text-slate-700">·</span> ETA, headway &amp; passenger load are simulated, not live feeds or official thresholds.</p>
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      const byId = (id) => document.getElementById(id);
+      const routePaths = [
+        document.createElementNS("http://www.w3.org/2000/svg", "path"),
+        document.createElementNS("http://www.w3.org/2000/svg", "path"),
+        document.createElementNS("http://www.w3.org/2000/svg", "path"),
+        document.createElementNS("http://www.w3.org/2000/svg", "path")
+      ];
+      const routeSegments = [
+        "M180 120 C270 65 500 65 590 120",
+        "M590 120 C660 180 660 300 580 360",
+        "M580 360 C480 420 270 420 180 360",
+        "M180 360 C100 300 105 190 180 120"
+      ];
+      routePaths.forEach((path, index) => {
+        path.setAttribute("d", routeSegments[index]);
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", "none");
+        byId("routeMap").appendChild(path);
+      });
+
+      const lengths = routePaths.map((path) => path.getTotalLength());
+      const loopLength = lengths.reduce((sum, length) => sum + length, 0);
+      const busElements = [...document.querySelectorAll("[data-bus]")];
+      const basePositions = busElements.map((_, index) => loopLength * index / busElements.length);
+      let positions = [...basePositions];
+      let bunching = false;
+      let accident = false;
+      let lastFrame = 0;
+      const bypass = byId("alternatePath");
+      const bypassLength = bypass.getTotalLength();
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      function routePoint(distance) {
+        let remaining = (distance % loopLength + loopLength) % loopLength;
+        let segment = 0;
+        while (segment < lengths.length - 1 && remaining >= lengths[segment]) {
+          remaining -= lengths[segment];
+          segment += 1;
+        }
+        const point = routePaths[segment].getPointAtLength(remaining);
+        const angleAhead = routePaths[segment].getPointAtLength(Math.min(lengths[segment], remaining + 1));
+        let result = { x: point.x, y: point.y, angle: Math.atan2(angleAhead.y - point.y, angleAhead.x - point.x) * 180 / Math.PI };
+        if (accident && segment === 1) {
+          const progress = remaining / lengths[segment];
+          const alternate = bypass.getPointAtLength(progress * bypassLength);
+          const next = bypass.getPointAtLength(Math.min(bypassLength, progress * bypassLength + 1));
+          result = { x: alternate.x, y: alternate.y, angle: Math.atan2(next.y - alternate.y, next.x - alternate.x) * 180 / Math.PI };
+        }
+        return result;
+      }
+
+      function drawBuses() {
+        busElements.forEach((bus, index) => {
+          const point = routePoint(positions[index]);
+          bus.setAttribute("transform", `translate(${point.x} ${point.y}) rotate(${point.angle})`);
+        });
+      }
+
+      function animate(now) {
+        if (!reducedMotion && now - lastFrame > 30) {
+          const step = Math.min(now - (lastFrame || now), 50) * .012;
+          if (!bunching) positions = positions.map((position) => (position + step) % loopLength);
+          lastFrame = now;
+          drawBuses();
+        }
+        requestAnimationFrame(animate);
+      }
+      drawBuses();
+      requestAnimationFrame(animate);
+
+      function updateClock() {
+        byId("clock").textContent = new Intl.DateTimeFormat(undefined, {
+          hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+        }).format(new Date());
+      }
+      updateClock();
+      window.setInterval(updateClock, 1000);
+
+      const apiRoot = "https://rt.data.gov.hk/v2/transport/citybus";
+      const fallbackRoutes = {
+        "788": {
+          orig_en: "Siu Sai Wan (Island Resort)",
+          dest_en: "Central (Macao Ferry)",
+          directions: {
+            outbound: { total: 14, stops: [
+              { seq: 1, id: "001382", name: "Siu Sai Wan (Island Resort)" },
+              { seq: 5, id: "001226", name: "Fu Shing Court, Chai Wan Road" },
+              { seq: 9, id: "001074", name: "Admiralty - Admiralty Centre, Harcourt Road" },
+              { seq: 14, id: "001027", name: "Central (Macao Ferry)" }
+            ] },
+            inbound: { total: 15, stops: [
+              { seq: 1, id: "001027", name: "Central (Macao Ferry)" },
+              { seq: 5, id: "001031", name: "City Hall, Connaught Road Central" },
+              { seq: 10, id: "001305", name: "Kailey Industrial Centre, Sheung On Street" },
+              { seq: 15, id: "001382", name: "Siu Sai Wan (Island Resort)" }
+            ] }
+          }
+        },
+        "8P": {
+          orig_en: "Siu Sai Wan (Island Resort)",
+          dest_en: "Exhibition Centre Station",
+          directions: {
+            outbound: { total: 14, stops: [
+              { seq: 1, id: "001382", name: "Siu Sai Wan (Island Resort)" },
+              { seq: 5, id: "001226", name: "Fu Shing Court, Chai Wan Road" },
+              { seq: 9, id: "001374", name: "Wing Hing Street" },
+              { seq: 14, id: "003415", name: "Exhibition Centre Station" }
+            ] },
+            inbound: { total: 14, stops: [
+              { seq: 1, id: "003415", name: "Exhibition Centre Station" },
+              { seq: 5, id: "001213", name: "Victoria Park, Causeway Road" },
+              { seq: 9, id: "001224", name: "Yue Wan Estate, Chai Wan Road" },
+              { seq: 14, id: "001382", name: "Siu Sai Wan (Island Resort)" }
+            ] }
+          }
+        },
+        "969": {
+          orig_en: "Tin Shui Wai Town Centre",
+          dest_en: "Causeway Bay (Moreton Terrace)",
+          directions: {
+            outbound: { total: 33, stops: [
+              { seq: 1, id: "002666", name: "Tin Yan Estate" },
+              { seq: 11, id: "001989", name: "Maywood Court Kingswood Villas, Tin Kwai Road" },
+              { seq: 22, id: "003253", name: "Western Fire Services Street, Connaught Road West" },
+              { seq: 33, id: "002536", name: "Causeway Bay (Moreton Terrace)" }
+            ] },
+            inbound: { total: 21, stops: [
+              { seq: 1, id: "002536", name: "Causeway Bay (Moreton Terrace)" },
+              { seq: 7, id: "001140", name: "Admiralty - Pacific Place, Queensway" },
+              { seq: 14, id: "002000", name: "Tin Shing Court, Tin Yiu Road" },
+              { seq: 21, id: "002003", name: "Tin Shui Wai Town Centre" }
+            ] }
+          }
+        }
+      };
+      const stopCache = new Map();
+      const routeStopCache = new Map();
+      const markerGroups = ["stopA", "stopB", "stopC", "stopD"].map(byId);
+      let activeRoute = "788";
+      let activeRouteInfo = fallbackRoutes["788"];
+      let activeDirection = "outbound";
+      let activeStops = [];
+      let activeStopSource = "demo";
+      let focusIndex = 1;
+      let surgeActive = false;
+      let routeLookupId = 0;
+      let directionLookupId = 0;
+      let searchTimer = 0;
+
+      function setSearchStatus(message, isError = false) {
+        const status = byId("routeSearchStatus");
+        status.textContent = message;
+        status.classList.toggle("text-[#E30613]", isError);
+        status.classList.toggle("text-[#003366]/65", !isError);
+      }
+
+      async function fetchJson(url) {
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), 7000);
+        try {
+          const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
+          if (!response.ok) throw new Error(`CTB API returned HTTP ${response.status}`);
+          const payload = await response.json();
+          if (!payload || payload.data == null) throw new Error("CTB API returned an empty response");
+          return payload.data;
+        } catch (error) {
+          if (error.name === "AbortError") throw new Error("CTB API request timed out");
+          throw error;
+        } finally {
+          window.clearTimeout(timeout);
+        }
+      }
+
+      async function fetchRouteInfo(route) {
+        let lastError;
+        for (const serviceType of ["1", "2", "3"]) {
+          try {
+            const info = await fetchJson(`${apiRoot}/route/CTB/${encodeURIComponent(route)}?route=${encodeURIComponent(route)}&direction=outbound&service_type=${serviceType}`);
+            if (info.route && info.orig_en && info.dest_en) return info;
+            lastError = new Error("No matching CTB route was returned");
+          } catch (error) {
+            lastError = error;
+          }
+        }
+        throw lastError || new Error("No matching CTB route was returned");
+      }
+
+      function routeDestination(info, direction) {
+        return direction === "outbound" ? info.dest_en : info.orig_en;
+      }
+
+      function renderRouteChoices(route, info) {
+        const container = byId("routeDirectionButtons");
+        container.replaceChildren();
+        for (const direction of ["outbound", "inbound"]) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "route-direction inline-flex min-h-[37px] items-center gap-1.5 rounded-lg border border-[#003366]/20 bg-white px-3 py-2 text-[10px] font-semibold text-[#003366] transition hover:border-[#003366] hover:bg-[#F4F6F9]";
+          button.setAttribute("aria-pressed", String(route === activeRoute && direction === activeDirection));
+          button.dataset.direction = direction;
+          const arrow = document.createElement("span");
+          arrow.setAttribute("aria-hidden", "true");
+          arrow.textContent = direction === "outbound" ? "→" : "←";
+          const label = document.createElement("span");
+          label.textContent = `To: ${routeDestination(info, direction)}`;
+          button.append(arrow, label);
+          button.addEventListener("click", () => selectDirection(route, info, direction));
+          container.appendChild(button);
+        }
+      }
+
+      function renderRouteInfo(route, info) {
+        activeRoute = route;
+        activeRouteInfo = info;
+        byId("pageRouteHeading").textContent = `Route ${route} · Fleet operations`;
+        byId("mapHeading").textContent = `Route ${route} · ${activeDirection === "outbound" ? "Outbound" : "Inbound"}`;
+        byId("routeEndpoints").textContent = `${info.orig_en} ↔ ${info.dest_en}`;
+        byId("svgTitle").textContent = `Schematic Citybus Route ${route} map`;
+        document.title = `Citybus Route ${route} · BusPulse AI`;
+        const routeLink = document.querySelector("footer a[href*='route/CTB/']");
+        routeLink.href = `${apiRoot}/route/CTB/${encodeURIComponent(route)}?route=${encodeURIComponent(route)}&direction=outbound&service_type=1`;
+      }
+
+      function normalizeRoute(value) {
+        return value.trim().toUpperCase();
+      }
+
+      async function lookupRoute(value) {
+        const route = normalizeRoute(value);
+        const lookupId = ++routeLookupId;
+        if (!/^[A-Z0-9]{1,6}$/.test(route)) {
+          byId("routeDirectionButtons").replaceChildren();
+          setSearchStatus("Enter a route number using letters and digits, such as 788 or A11.", true);
+          return;
+        }
+
+        byId("routeInput").value = route;
+        const fallback = fallbackRoutes[route];
+        if (fallback) {
+          renderRouteChoices(route, fallback);
+          setSearchStatus(`Route ${route} · instant presentation choices loaded; checking CTB data…`);
+        } else {
+          byId("routeDirectionButtons").replaceChildren();
+          setSearchStatus(`Searching CTB for Route ${route}…`);
+        }
+
+        try {
+          const info = await fetchRouteInfo(route);
+          if (lookupId !== routeLookupId) return;
+          renderRouteChoices(route, info);
+          setSearchStatus(`CTB Route ${route} found · choose a destination.`);
+        } catch (error) {
+          if (lookupId !== routeLookupId) return;
+          if (fallback) {
+            renderRouteChoices(route, fallback);
+            setSearchStatus(`CTB API unavailable (${error.message}) · using saved Route ${route} demo choices.`);
+            console.warn(`Route ${route} lookup failed; using presentation fallback.`, error);
+          } else {
+            setSearchStatus(`Could not load Route ${route}: ${error.message}. Check the route number or network connection.`, true);
+            console.error(`Route ${route} lookup failed.`, error);
+          }
+        }
+      }
+
+      function representativeStops(stops) {
+        if (stops.length <= 4) return stops;
+        const indices = [0, Math.floor((stops.length - 1) / 3), Math.floor(2 * (stops.length - 1) / 3), stops.length - 1];
+        return [...new Set(indices)].map((index) => stops[index]);
+      }
+
+      function renderMapMarkers(stops, total) {
+        const samples = representativeStops(stops);
+        markerGroups.forEach((group, index) => {
+          const stop = samples[index];
+          if (!stop) {
+            group.style.display = "none";
+            return;
+          }
+          group.style.display = "";
+          group.querySelector(".map-label").textContent = stop.name;
+          group.querySelector(".map-caption").textContent = `STOP ${stop.seq} OF ${total}`;
+          group.setAttribute("aria-label", `Stop ${stop.seq} of ${total}: ${stop.name}`);
+        });
+      }
+
+      function renderSequence(stops, total) {
+        const sequence = byId("routeStopSequence");
+        sequence.replaceChildren();
+        const meta = document.createElement("span");
+        meta.className = "self-center whitespace-nowrap text-[8px] font-bold uppercase tracking-wide text-slate-500";
+        meta.textContent = activeStopSource === "api"
+          ? `All ${total} CTB stops`
+          : `${stops.length} saved samples · ${total}-stop route`;
+        sequence.appendChild(meta);
+        stops.forEach((stop) => {
+          const item = document.createElement("span");
+          item.className = "inline-flex max-w-[220px] shrink-0 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-[9px] text-slate-600";
+          item.title = `Stop ${stop.seq} of ${total}`;
+          const number = document.createElement("b");
+          number.className = "text-[#003366]";
+          number.textContent = String(stop.seq);
+          const name = document.createElement("span");
+          name.className = "truncate";
+          name.textContent = stop.name;
+          item.append(number, name);
+          sequence.appendChild(item);
+        });
+      }
+
+      function setLoadStatus(value, crowded) {
+        byId("queueCount").textContent = String(value);
+        byId("loadStatus").replaceChildren();
+        byId("loadStatus").classList.toggle("text-rose-300", crowded);
+        byId("loadStatus").classList.toggle("text-mint", !crowded);
+        byId("loadStatus").append(document.createTextNode(crowded ? "Crowded " : "Normal "));
+        const pax = document.createElement("span");
+        pax.className = "text-[10px] font-normal text-slate-500";
+        pax.textContent = `· ${value} pax`;
+        byId("loadStatus").appendChild(pax);
+      }
+
+      function renderDemandBars() {
+        const container = byId("demandBars");
+        container.replaceChildren();
+        const values = activeStops.map((_, index) => 12 + ((index * 11 + 7) % 25));
+        if (values.length) values[focusIndex] = surgeActive ? 64 : 18;
+        if (surgeActive) {
+          values.forEach((value, index) => {
+            if (index !== focusIndex && index % 3 === 0) values[index] = Math.max(value, 34);
+          });
+        }
+        activeStops.forEach((stop, index) => {
+          const item = document.createElement("div");
+          item.className = "flex w-[76px] shrink-0 flex-col items-center gap-1";
+          item.title = `Stop ${stop.seq}: ${stop.name} · simulated queue ${values[index]} passengers`;
+          const track = document.createElement("div");
+          track.className = "flex h-[43px] w-full items-end justify-center";
+          const bar = document.createElement("span");
+          bar.className = "queue-fill block w-3 rounded-t-sm";
+          bar.style.height = `${Math.min(43, 8 + values[index] * .55)}px`;
+          bar.style.backgroundColor = values[index] >= 34 ? "#E30613" : index === focusIndex ? "#FFCD00" : "#8BA3BD";
+          bar.setAttribute("aria-hidden", "true");
+          track.appendChild(bar);
+          const name = document.createElement("span");
+          name.className = `max-w-full text-center text-[8px] leading-tight ${index === focusIndex ? "font-semibold text-slate-700" : "text-slate-500"}`;
+          name.textContent = stop.name;
+          item.append(track, name);
+          container.appendChild(item);
+        });
+        if (!activeStops.length) {
+          const empty = document.createElement("span");
+          empty.className = "py-4 text-[10px] text-slate-500";
+          empty.textContent = "Select a route direction to load stop demand.";
+          container.appendChild(empty);
+          byId("demandStopName").textContent = "No stop selected";
+          byId("nextBusLabel").textContent = "Next bus";
+          byId("loadStopLabel").textContent = "Passenger load";
+          return;
+        }
+        const focusStop = activeStops[focusIndex];
+        byId("demandStopName").textContent = focusStop.name;
+        byId("alertStopName").textContent = focusStop.name;
+        byId("nextBusLabel").textContent = `Next bus · ${focusStop.name}`;
+        byId("loadStopLabel").textContent = `Passenger load · ${focusStop.name}`;
+        setLoadStatus(values[focusIndex], surgeActive);
+      }
+
+      function updateRoutePresentation(route, info, direction, stops, total, source) {
+        activeRoute = route;
+        activeRouteInfo = info;
+        activeDirection = direction;
+        activeStops = stops;
+        activeStopSource = source;
+        focusIndex = Math.min(1, Math.max(0, stops.length - 1));
+        surgeActive = false;
+        bunching = false;
+        accident = false;
+        positions = [...basePositions];
+        renderRouteInfo(route, info);
+        byId("mapHeading").textContent = `Route ${route} · ${direction === "outbound" ? "Outbound" : "Inbound"}`;
+        byId("svgDesc").textContent = `Schematic Citybus Route ${route}, ${direction}, with ${total} stops in sequence. Four animated buses travel the circuit and divert via the King's Road / Chai Wan Road Detour when an accident is injected. Vehicle positions are simulated.`;
+        renderMapMarkers(stops, total);
+        renderSequence(stops, total);
+        renderDemandBars();
+        byId("demandAlert").classList.add("hidden");
+        byId("demandAlert").classList.remove("alert-enter");
+        byId("accidentMarker").style.display = "none";
+        byId("alternatePath").classList.remove("active");
+        byId("routeMap").querySelector(".route-line").classList.remove("pulse");
+        byId("incidentBadge").textContent = "CLEAR";
+        byId("incidentBadge").className = "mt-1 rounded-full border border-mint/15 bg-mint/[.06] px-2 py-1 text-[9px] font-medium text-mint";
+        byId("mapStatus").innerHTML = '<span class="h-1.5 w-1.5 rounded-full bg-mint"></span>On schedule';
+        byId("mapStatus").classList.remove("text-amber");
+        byId("mapStatus").classList.add("text-mint");
+        byId("etaValue").textContent = "12";
+        byId("etaDelta").textContent = "On time";
+        byId("etaDelta").className = "rounded-md bg-mint/[.08] px-2 py-1 text-[9px] font-medium text-mint";
+        byId("nextBusValue").textContent = "3";
+        byId("headwayScore").textContent = "94";
+        byId("headwayScore").classList.remove("text-rose-300");
+        byId("headwayScore").classList.add("text-mint");
+        byId("headwayStatus").innerHTML = 'Even <span class="text-[10px] font-normal text-slate-500">· 6 min</span>';
+        byId("headwayStatus").classList.remove("text-rose-300");
+        byId("headwayStatus").classList.add("text-mint");
+        byId("rlMode").textContent = "AUTO CONTROL";
+        byId("rlMode").className = "mt-1 rounded-full border border-mint/15 bg-mint/[.06] px-2 py-1 text-[9px] font-medium text-mint";
+        byId("rerouteNotice").classList.add("hidden");
+        drawBuses();
+      }
+
+      async function resolveRouteStops(route, direction) {
+        const cacheKey = `${route}:${direction}`;
+        if (routeStopCache.has(cacheKey)) return routeStopCache.get(cacheKey);
+        const apiDirection = direction === "outbound" ? "OutBound" : "InBound";
+        const records = await fetchJson(`${apiRoot}/route-stop/CTB/${encodeURIComponent(route)}/${apiDirection}`);
+        if (!Array.isArray(records) || records.length === 0) throw new Error("CTB returned no stops for this direction");
+        const resolved = new Array(records.length);
+        let cursor = 0;
+        let failure = null;
+        async function worker() {
+          while (cursor < records.length) {
+            const index = cursor++;
+            const record = records[index];
+            try {
+              const details = stopCache.has(record.stop)
+                ? stopCache.get(record.stop)
+                : await fetchJson(`${apiRoot}/stop/${encodeURIComponent(record.stop)}`);
+              const name = details.name_en || details.name_tc;
+              if (!name) throw new Error(`CTB returned no name for stop ${record.stop}`);
+              stopCache.set(record.stop, details);
+              resolved[index] = { seq: record.seq, id: record.stop, name };
+            } catch (error) {
+              failure ||= error;
+            }
+          }
+        }
+        await Promise.all(Array.from({ length: Math.min(8, records.length) }, () => worker()));
+        if (failure) throw new Error(`Could not resolve the full stop list: ${failure.message}`);
+        const result = { total: records.length, stops: resolved };
+        routeStopCache.set(cacheKey, result);
+        return result;
+      }
+
+      async function selectDirection(route, info, direction) {
+        const lookupId = ++directionLookupId;
+        renderRouteChoices(route, info);
+        const choice = fallbackRoutes[route];
+        const offline = choice && choice.directions[direction];
+        if (offline) {
+          updateRoutePresentation(route, info, direction, offline.stops, offline.total, "fallback");
+          setSearchStatus(`Route ${route} · ${direction} · showing saved sample stops while CTB data loads.`);
+        } else {
+          setSearchStatus(`Loading CTB ${direction} stop list for Route ${route}…`);
+        }
+
+        try {
+          const result = await resolveRouteStops(route, direction);
+          if (lookupId !== directionLookupId) return;
+          updateRoutePresentation(route, info, direction, result.stops, result.total, "api");
+          renderRouteChoices(route, info);
+          setSearchStatus(`CTB Route ${route} · ${direction} · ${result.total} named stops loaded.`);
+        } catch (error) {
+          if (lookupId !== directionLookupId) return;
+          if (offline) {
+            setSearchStatus(`CTB stop lookup unavailable (${error.message}) · saved Route ${route} samples remain active.`);
+            console.warn(`Route ${route} ${direction} stops unavailable; using presentation fallback.`, error);
+          } else {
+            setSearchStatus(`Could not load Route ${route} stops: ${error.message}.`, true);
+            console.error(`Route ${route} ${direction} stop lookup failed.`, error);
+          }
+        }
+      }
+
+      byId("routeSearchForm").addEventListener("submit", (event) => {
+        event.preventDefault();
+        window.clearTimeout(searchTimer);
+        lookupRoute(byId("routeInput").value);
+      });
+
+      byId("routeInput").addEventListener("input", () => {
+        const route = normalizeRoute(byId("routeInput").value);
+        byId("routeInput").value = route;
+        window.clearTimeout(searchTimer);
+        const fallback = fallbackRoutes[route];
+        if (fallback) {
+          renderRouteChoices(route, fallback);
+          setSearchStatus(`Route ${route} · saved directions ready; checking CTB data…`);
+        } else if (route) {
+          setSearchStatus(`Searching CTB for Route ${route}…`);
+        }
+        searchTimer = window.setTimeout(() => lookupRoute(route), 400);
+      });
+
+      byId("surgeButton").addEventListener("click", () => {
+        surgeActive = true;
+        renderDemandBars();
+        byId("demandAlert").classList.remove("hidden");
+        byId("demandAlert").classList.add("alert-enter");
+      });
+
+      byId("bunchButton").addEventListener("click", () => {
+        bunching = true;
+        const center = (positions[0] + loopLength * .12) % loopLength;
+        positions = [center, center + loopLength * .025, center + loopLength * .51, center + loopLength * .76]
+          .map((position) => (position % loopLength + loopLength) % loopLength);
+        byId("headwayScore").textContent = "38";
+        byId("headwayScore").classList.remove("text-mint");
+        byId("headwayScore").classList.add("text-rose-300");
+        byId("headwayStatus").innerHTML = 'Irregular <span class="text-[10px] font-normal text-slate-500">· buses bunched</span>';
+        byId("headwayStatus").classList.remove("text-mint");
+        byId("headwayStatus").classList.add("text-rose-300");
+        byId("frequencyValue").textContent = "6";
+        byId("nextBusValue").textContent = "1";
+        byId("rlMode").textContent = "BUNCHING DETECTED";
+        byId("rlMode").className = "mt-1 rounded-full border border-rose-300/20 bg-rose-400/[.07] px-2 py-1 text-[9px] font-medium text-rose-300";
+        drawBuses();
+      });
+
+      byId("antiBunchButton").addEventListener("click", () => {
+        bunching = false;
+        positions = [...basePositions];
+        byId("headwayScore").textContent = "98";
+        byId("headwayScore").classList.remove("text-rose-300");
+        byId("headwayScore").classList.add("text-mint");
+        byId("headwayStatus").innerHTML = 'Even <span class="text-[10px] font-normal text-slate-500">· 6 min</span>';
+        byId("headwayStatus").classList.remove("text-rose-300");
+        byId("headwayStatus").classList.add("text-mint");
+        byId("frequencyValue").textContent = "6";
+        byId("nextBusValue").textContent = "3";
+        byId("rlMode").textContent = "AUTO CONTROL";
+        byId("rlMode").className = "mt-1 rounded-full border border-mint/15 bg-mint/[.06] px-2 py-1 text-[9px] font-medium text-mint";
+        drawBuses();
+      });
+
+      byId("accidentButton").addEventListener("click", () => {
+        accident = true;
+        byId("accidentMarker").style.display = "block";
+        byId("alternatePath").classList.add("active");
+        byId("routeMap").querySelector(".route-line").classList.add("pulse");
+        byId("incidentBadge").textContent = "REROUTING";
+        byId("incidentBadge").className = "mt-1 rounded-full border border-rose-300/20 bg-rose-400/[.07] px-2 py-1 text-[9px] font-medium text-rose-300";
+        byId("etaValue").textContent = "15";
+        byId("nextBusValue").textContent = "5";
+        byId("etaDelta").textContent = "+3 min";
+        byId("etaDelta").className = "rounded-md bg-amber/[.09] px-2 py-1 text-[9px] font-medium text-amber";
+        byId("mapStatus").innerHTML = '<span class="h-1.5 w-1.5 rounded-full bg-amber"></span>Rerouting';
+        byId("mapStatus").classList.remove("text-mint");
+        byId("mapStatus").classList.add("text-amber");
+        byId("rerouteNotice").classList.remove("hidden");
+        byId("rerouteNotice").classList.add("alert-enter");
+        drawBuses();
+      });
+
+      byId("resetButton").addEventListener("click", () => {
+        bunching = false;
+        accident = false;
+        surgeActive = false;
+        positions = [...basePositions];
+        renderDemandBars();
+        byId("demandAlert").classList.add("hidden");
+        byId("demandAlert").classList.remove("alert-enter");
+        byId("headwayScore").textContent = "94";
+        byId("headwayScore").classList.remove("text-rose-300");
+        byId("headwayScore").classList.add("text-mint");
+        byId("headwayStatus").innerHTML = 'Even <span class="text-[10px] font-normal text-slate-500">· 6 min</span>';
+        byId("headwayStatus").classList.remove("text-rose-300");
+        byId("headwayStatus").classList.add("text-mint");
+        byId("frequencyValue").textContent = "6";
+        byId("nextBusValue").textContent = "3";
+        byId("rlMode").textContent = "AUTO CONTROL";
+        byId("rlMode").className = "mt-1 rounded-full border border-mint/15 bg-mint/[.06] px-2 py-1 text-[9px] font-medium text-mint";
+        byId("accidentMarker").style.display = "none";
+        byId("alternatePath").classList.remove("active");
+        byId("routeMap").querySelector(".route-line").classList.remove("pulse");
+        byId("incidentBadge").textContent = "CLEAR";
+        byId("incidentBadge").className = "mt-1 rounded-full border border-mint/15 bg-mint/[.06] px-2 py-1 text-[9px] font-medium text-mint";
+        byId("etaValue").textContent = "12";
+        byId("etaDelta").textContent = "On time";
+        byId("etaDelta").className = "rounded-md bg-mint/[.08] px-2 py-1 text-[9px] font-medium text-mint";
+        byId("mapStatus").innerHTML = '<span class="h-1.5 w-1.5 rounded-full bg-mint"></span>On schedule';
+        byId("mapStatus").classList.remove("text-amber");
+        byId("mapStatus").classList.add("text-mint");
+        byId("rerouteNotice").classList.add("hidden");
+        byId("rerouteNotice").classList.remove("alert-enter");
+        drawBuses();
+      });
+
+      renderRouteChoices(activeRoute, activeRouteInfo);
+      selectDirection(activeRoute, activeRouteInfo, activeDirection);
+    })();
+  </script>
+</body>
+</html>
